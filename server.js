@@ -7,6 +7,7 @@ const root = __dirname;
 const port = Number(process.env.PORT || 4173);
 const cache = new Map();
 let lastGeocodeAt = 0;
+let geocodeQueue = Promise.resolve();
 const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' };
 
 function send(res, status, body, type = 'application/json; charset=utf-8') {
@@ -14,14 +15,14 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.end(body);
 }
 
-async function proxy(url, key, res) {
+async function proxy(url, key, res, referer) {
   const hit = cache.get(key);
   if (hit && hit.expires > Date.now()) return send(res, 200, hit.body);
   try {
     const upstream = await fetch(url, {
       headers: {
         'User-Agent': 'WayfinderChennai/0.1 (open-source software-only accessibility project)',
-        'Referer': `http://localhost:${port}/`,
+        'Referer': referer,
         'Accept': 'application/json'
       }, signal: AbortSignal.timeout(20000)
     });
@@ -34,17 +35,32 @@ async function proxy(url, key, res) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:${port}`);
-  if (url.pathname === '/api/geocode') {
-    const query = (url.searchParams.get('q') || '').trim();
-    if (query.length < 3 || query.length > 120) return send(res, 400, JSON.stringify({ error: 'Enter a place name between 3 and 120 characters.' }));
+function waitForGeocodeSlot() {
+  const slot = geocodeQueue.then(async () => {
     const wait = Math.max(0, 1100 - (Date.now() - lastGeocodeAt));
     if (wait) await new Promise(resolve => setTimeout(resolve, wait));
     lastGeocodeAt = Date.now();
+  });
+  geocodeQueue = slot.catch(() => {});
+  return slot;
+}
+
+function appReferer(req) {
+  const protocol = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
+  const host = req.headers.host || `localhost:${port}`;
+  return `${protocol}://${host}/`;
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://localhost:${port}`);
+  if (url.pathname === '/healthz') return send(res, 200, JSON.stringify({ status: 'ok' }));
+  if (url.pathname === '/api/geocode') {
+    const query = (url.searchParams.get('q') || '').trim();
+    if (query.length < 3 || query.length > 120) return send(res, 400, JSON.stringify({ error: 'Enter a place name between 3 and 120 characters.' }));
+    await waitForGeocodeSlot();
     const bounded = new URL('https://nominatim.openstreetmap.org/search');
     bounded.search = new URLSearchParams({ q: `${query}, Chennai, Tamil Nadu, India`, format: 'jsonv2', limit: '1', viewbox: '79.85,13.45,80.55,12.45', bounded: '1' }).toString();
-    return proxy(bounded, `geocode:${query.toLowerCase()}`, res);
+    return proxy(bounded, `geocode:${query.toLowerCase()}`, res, appReferer(req));
   }
   if (url.pathname === '/api/pedestrian-route') {
     const values = ['fromLat', 'fromLon', 'toLat', 'toLon'].map(key => Number(url.searchParams.get(key)));
@@ -53,7 +69,7 @@ const server = http.createServer(async (req, res) => {
     }
     const [fromLat, fromLon, toLat, toLon] = values;
     const upstream = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson&steps=true`;
-    return proxy(upstream, `foot:${values.join(',')}`, res);
+    return proxy(upstream, `foot:${values.join(',')}`, res, appReferer(req));
   }
 
   let requested = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
@@ -66,4 +82,4 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(port, '127.0.0.1', () => console.log(`Wayfinder Chennai ready at http://localhost:${port}`));
+server.listen(port, '0.0.0.0', () => console.log(`Wayfinder Chennai ready on port ${port}`));

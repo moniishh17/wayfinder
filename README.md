@@ -4,7 +4,7 @@ An accessible multimodal journey-planning project for Chennai. It combines mappe
 
 ## Run locally
 
-Requirements: Node.js 18 or newer and an internet connection for map tiles, geocoding/routing, Leaflet, and the first COCO-SSD model download.
+Requirements: Node.js 22 or newer and an internet connection for map tiles, geocoding/routing, Leaflet, and the first COCO-SSD model download.
 
 ```sh
 cd chennai-wayfinder
@@ -12,6 +12,12 @@ node server.js
 ```
 
 Open <http://localhost:4173>. No package install, API key, special camera, or external hardware is required. An ordinary laptop webcam or phone camera is enough. A wider lens can show more of the scene, but a 180° camera is not required.
+
+## Deploy a public demo
+
+This project is a Node web service, not a static-only site: it uses `/api/geocode` and `/api/pedestrian-route` for server-side map requests. The included `render.yaml` deploys it as a Render web service on the free plan with a health check. Push the project to GitHub, then in Render choose **New → Blueprint** and select that repository. Render will show the service settings before creating it.
+
+The free service sleeps after 15 minutes without traffic and its first request after sleep can take about a minute. It is suitable for a portfolio demo, not dependable trip planning. The public OpenStreetMap geocoder has a strict application-wide limit of one request per second; this app queues searches and caches responses in memory. Its community foot-routing server and map tiles also have no availability guarantee. Review the linked service policies before wider use.
 
 ## What works
 
@@ -36,7 +42,7 @@ Station names and order are taken from [CMRL's official Blue Line list](https://
 
 The background map uses [OpenStreetMap](https://www.openstreetmap.org/copyright) and requires visible attribution. Pedestrian directions are requested from the community-hosted [OpenStreetMap routing server](https://routing.openstreetmap.de/). Availability can change and this public service has no guarantee. Its foot profile is not a wheelchair profile. A pedestrian route is not proof of step-free access, safe crossings, clear sidewalks, or current conditions. The app reports accessibility as unknown when the source does not provide it.
 
-Nominatim is called only after a person submits a place search; no autocomplete or bulk geocoding is used. See the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/). For a public deployment, set an application-specific contact/referer and select service providers whose terms and capacity match the deployment.
+Nominatim is called only after a person submits a place search; no autocomplete or bulk geocoding is used. The server identifies the app and derives the Referer from the public request host. See the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/). For broader use, select service providers whose terms and capacity match the deployment.
 
 ## License notes
 
