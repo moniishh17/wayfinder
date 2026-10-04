@@ -1,5 +1,7 @@
 # Wayfinder Chennai
 
+**Live demo:** [Open Wayfinder Chennai](https://wayfinder-chennai.onrender.com)
+
 An accessible multimodal journey-planning project for Chennai. It combines mapped pedestrian routing, CMRL Phase I station sequences, MTC route/stop patterns, browser speech, and on-device webcam object labeling.
 
 ## Run locally
