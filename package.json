@@ -1,0 +1,9 @@
+{
+  "name": "wayfinder-chennai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Software-only accessible multimodal journey planner for Chennai",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

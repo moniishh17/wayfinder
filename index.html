@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f8f5">
+  <title>Wayfinder Chennai — accessible journey planner</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Wayfinder Chennai home"><span class="brand-icon">↗</span><span>wayfinder <small>CHENNAI</small></span></a>
+    <div class="top-actions"><span class="data-pill"><i></i> Open street + transit data</span><button id="blind-mode" class="quiet-button" aria-pressed="false">◖)) Audio-first mode</button></div>
+  </header>
+  <main class="app-shell">
+    <section class="intro">
+      <div><div class="eyebrow">Accessible multimodal trip planning</div><h1>Get there with more confidence.</h1><p>Compare pedestrian routes, Chennai Metro, and MTC bus patterns. Check what is known, and what still needs confirmation.</p></div>
+      <div class="city-mark"><span>⌖</span><div><strong>Chennai, Tamil Nadu</strong><small>13.0827° N · 80.2707° E</small></div></div>
+    </section>
+    <section id="audio-panel" class="audio-panel" hidden aria-live="polite">
+      <div><strong>Audio-first mode</strong><p>Say a start and destination, or say “walk”, “bus”, “repeat”, or “next step”. Directions use your browser’s speech tools.</p><span id="voice-status">Camera object alerts are local to this device. This is not a safety system.</span></div>
+      <button id="voice-listen" class="primary-button">🎙 Speak</button>
+    </section>
+    <div class="workspace" id="visual-workspace">
+      <section class="left-column">
+        <form id="route-form" class="panel planner">
+          <div class="section-heading"><div><span class="eyebrow">Plan a trip</span><h2>Where do you want to go?</h2></div><span class="demo-tag">REAL DATA</span></div>
+          <label for="origin">START</label><div class="location-field"><span class="location-dot start-dot"></span><input id="origin" autocomplete="off" value="Puratchi Thalaivar M.G.R. Central Metro Station, Chennai" required><button type="button" id="use-location" class="icon-button" title="Use my location" aria-label="Use my location">⌖</button></div>
+          <button type="button" id="swap-locations" class="swap-button" aria-label="Swap start and destination">↕</button>
+          <label for="destination">DESTINATION</label><div class="location-field"><span class="location-dot end-dot"></span><input id="destination" autocomplete="off" value="Chennai International Airport Metro Station, Chennai" required></div>
+          <div class="preferences"><label for="access-profile">BOARDING ACCESS FILTER</label><select id="access-profile"><option value="stepfree">Hide stops marked inaccessible</option><option value="pedestrian">Show all boarding statuses</option></select><p class="form-note">This only filters known GTFS stop flags. It cannot confirm a step-free journey.</p></div>
+          <button type="submit" id="plan-button" class="primary-button full-button">Find routes <span>→</span></button>
+          <p class="form-note">Search runs only when you submit. Places are looked up with OpenStreetMap.</p>
+        </form>
+        <section class="panel results-panel" aria-labelledby="routes-title">
+          <div class="section-heading"><div><span class="eyebrow">Your options</span><h2 id="routes-title">Routes for this trip</h2></div><span id="result-count" class="result-count">Enter a trip</span></div>
+          <div id="route-results" class="route-results"><div class="empty-state"><span>↗</span><strong>Plan a Chennai journey</strong><p>Transit choices are matched against actual MTC stop and route patterns. Walking routes use the OpenStreetMap pedestrian network.</p></div></div>
+          <div id="route-detail" class="route-detail" hidden></div>
+        </section>
+        <section class="panel camera-panel">
+          <div class="section-heading"><div><span class="eyebrow">On-device camera</span><h2>See objects in your surroundings</h2></div><span id="camera-state" class="camera-state">OFF</span></div>
+          <p class="camera-copy">Use a phone or laptop webcam. A browser-based COCO-SSD model can label common objects in view; it does not detect curb quality, stairs, or a safe path.</p>
+          <div class="camera-row"><div id="camera-frame" class="camera-frame"><video id="camera-video" playsinline muted></video><canvas id="camera-canvas"></canvas><div class="camera-placeholder">Camera preview stays on this device</div></div><div class="camera-controls"><label for="camera-select">CAMERA</label><select id="camera-select"><option value="">Default camera</option></select><button id="camera-start" class="outline-button">Start camera</button><button id="camera-stop" class="outline-button" disabled>Stop</button><div id="detections" class="detections" aria-live="polite">Object detection not running.</div></div></div>
+          <p class="privacy-note">Video frames are processed in your browser and are not uploaded by this app. First use downloads the model files from TensorFlow’s public CDN. Object labels are experimental and do not alter route choices.</p>
+        </section>
+      </section>
+      <section class="map-column panel"><div class="map-top"><div><strong>Chennai street map</strong><span id="map-caption">Showing actual mapped CMRL stations and MTC stops</span></div><button id="locate-map" class="icon-button" aria-label="Center map on Chennai">⌖</button></div><div id="map" role="application" aria-label="Map with Chennai transit stops and pedestrian route"></div><div class="map-legend"><span><i class="bus-key"></i>MTC stop</span><span><i class="metro-key"></i>CMRL station</span><span><i class="origin-key"></i>Start / destination</span><span><i class="walk-key"></i>OSM pedestrian route</span></div><div class="map-foot">© OpenStreetMap contributors · Metro lines are station-to-station schematics. No accessibility guarantee.</div></section>
+    </div>
+    <section class="data-notice"><strong>Data freshness and access</strong><span id="data-status">Loading Chennai GTFS route data…</span><span>Transit patterns are static and can be outdated; verify with operators. This app has no MTC live vehicle feed. Unknown accessibility stays marked unknown.</span></section>
+  <footer>Wayfinder Chennai · software-only project · <a href="https://github.com/ungalsoththu/ChennaiGTFS" target="_blank" rel="noreferrer">MTC GTFS source</a> · <a href="https://chennaimetrorail.org/bd-category/business-development/to-know-station-wise/blue-line/" target="_blank" rel="noreferrer">CMRL official station lists</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap attribution</a></footer>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
+  <script src="app.js"></script>
+</body>
+</html>
