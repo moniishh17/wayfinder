@@ -213,6 +213,11 @@ function renderTransitCards() {
   });
   return true;
 }
+
+function formatDistance(meters) {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+}
+
 function getChennaiWalkAdvisories(route, steps) {
   const advisories = [];
   const roadNames = steps.map(s => s.name || '').filter(Boolean).join(' ').toLowerCase();
