@@ -39,15 +39,21 @@
     <div class="workspace" id="visual-workspace">
       <section class="left-column">
         <form id="route-form" class="panel planner">
-          <div class="section-heading"><div><span class="eyebrow">Plan a trip</span><h2>Where do you want to go?</h2></div><span class="demo-tag">REAL DATA</span></div>
-          <label for="origin">START</label><div class="location-field"><span class="location-dot start-dot"></span><input id="origin" autocomplete="off" value="Puratchi Thalaivar M.G.R. Central Metro Station, Chennai" required><button type="button" id="use-location" class="icon-button" title="Use my location" aria-label="Use my location">⌖</button></div>
-          <button type="button" id="swap-locations" class="swap-button" aria-label="Swap start and destination">↕</button>
+          <div class="section-heading"><div><span class="eyebrow">Plan a trip</span><h2>Where do you want to go?</h2></div><span class="demo-tag" title="Derived from Chennai GTFS schedule feed, not live GPS">GTFS SCHEDULES</span></div>
+          <label for="origin">START</label><div class="location-field"><span class="location-dot start-dot"></span><input id="origin" autocomplete="off" value="Puratchi Thalaivar M.G.R. Central Metro Station, Chennai" required><button type="button" id="use-location" class="icon-button" title="Use current GPS location" aria-label="Use current GPS location as starting point">⌖</button></div>
+          <button type="button" id="swap-locations" class="swap-button" title="Swap start and destination" aria-label="Swap start and destination locations">↕</button>
           <label for="destination">DESTINATION</label><div class="location-field"><span class="location-dot end-dot"></span><input id="destination" autocomplete="off" value="Chennai International Airport Metro Station, Chennai" required></div>
+          <div class="preset-trips" aria-label="Quick preset routes">
+            <span class="preset-label">Quick test:</span>
+            <button type="button" class="preset-chip" data-origin="Puratchi Thalaivar M.G.R. Central Metro Station, Chennai" data-dest="Chennai International Airport Metro Station, Chennai">Central ➔ Airport</button>
+            <button type="button" class="preset-chip" data-origin="T. Nagar Bus Terminus, Chennai" data-dest="Marina Beach, Chennai">T. Nagar ➔ Marina</button>
+            <button type="button" class="preset-chip" data-origin="Puratchi Thalaivi Dr. J. Jayalalithaa CMBT, Chennai" data-dest="Guindy Railway Station, Chennai">CMBT ➔ Guindy</button>
+          </div>
           <div class="preferences"><label for="access-profile">BOARDING ACCESS FILTER</label><select id="access-profile"><option value="stepfree">Hide stops marked inaccessible</option><option value="pedestrian">Show all boarding statuses</option></select><p class="form-note">This only filters known GTFS stop flags. It cannot confirm a step-free journey.</p></div>
           <button type="submit" id="plan-button" class="primary-button full-button">Find routes <span>→</span></button>
           <p class="form-note">Search runs only when you submit. Places are looked up with OpenStreetMap.</p>
         </form>
-        <section class="panel results-panel" aria-labelledby="routes-title">
+        <section class="panel results-panel" aria-labelledby="routes-title" aria-live="polite">
           <div class="section-heading"><div><span class="eyebrow">Your options</span><h2 id="routes-title">Routes for this trip</h2></div><span id="result-count" class="result-count">Enter a trip</span></div>
           <div id="route-results" class="route-results"><div class="empty-state"><span>↗</span><strong>Plan a Chennai journey</strong><p>Transit choices are matched against actual MTC stop and route patterns. Walking routes use the OpenStreetMap pedestrian network.</p></div></div>
           <div id="route-detail" class="route-detail" hidden></div>
@@ -72,6 +78,9 @@
                 <option value="400">High Responsiveness (2.5 FPS)</option>
               </select>
               <label class="haptic-toggle-row"><input type="checkbox" id="haptic-toggle" checked> Haptic buzz on phone</label>
+              <div class="camera-warning-callout">
+                ⚠️ <strong>Safety Notice:</strong> Experimental vision aid. Cannot reliably detect drop-offs, open storm drains, steps, or glass. Do not rely on this for street crossing.
+              </div>
               <div class="camera-buttons">
                 <button id="camera-start" class="outline-button">Start camera</button>
                 <button id="camera-stop" class="outline-button" disabled>Stop</button>
@@ -82,9 +91,9 @@
           <p class="privacy-note">Video frames are processed purely in your browser and are not uploaded. Proximity warnings estimate screen coverage and are experimental guidance, not an automated safety system.</p>
         </section>
       </section>
-      <section class="map-column panel"><div class="map-top"><div><strong>Chennai street map</strong><span id="map-caption">Showing actual mapped CMRL stations and MTC stops</span></div><button id="locate-map" class="icon-button" aria-label="Center map on Chennai">⌖</button></div><div id="map" role="application" aria-label="Map with Chennai transit stops and pedestrian route"></div><div class="map-legend"><span><i class="bus-key"></i>MTC stop</span><span><i class="metro-key"></i>CMRL station</span><span><i class="origin-key"></i>Start / destination</span><span><i class="walk-key"></i>OSM pedestrian route</span></div><div class="map-foot">© OpenStreetMap contributors · Metro lines are station-to-station schematics. No accessibility guarantee.</div></section>
+      <section class="map-column panel"><div class="map-top"><div><strong>Chennai street map</strong><span id="map-caption">Showing actual mapped CMRL stations and MTC stops</span></div><button id="locate-map" class="icon-button" title="Center map on Chennai" aria-label="Center map on Chennai">⌖</button></div><div id="map" role="application" aria-label="Map with Chennai transit stops and pedestrian route"></div><div class="map-legend"><span><i class="bus-key"></i>MTC stop</span><span><i class="metro-key"></i>CMRL station</span><span><i class="origin-key"></i>Start / destination</span><span><i class="walk-key"></i>OSM pedestrian route</span></div><div class="map-foot">© OpenStreetMap contributors · Metro lines are station-to-station schematics. No accessibility guarantee.</div></section>
     </div>
-    <section class="data-notice"><strong>Data freshness and access</strong><span id="data-status">Loading Chennai GTFS route data…</span><span>Transit patterns are static and can be outdated; verify with operators. This app has no MTC live vehicle feed. Unknown accessibility stays marked unknown.</span></section>
+    <section class="data-notice"><strong>Data freshness and access</strong><span id="data-status" aria-live="polite"><span class="spinner-pulse"></span>Loading Chennai GTFS route data…</span><span>Transit patterns are static and can be outdated; verify with operators. This app has no MTC live vehicle feed. Unknown accessibility stays marked unknown.</span></section>
   <footer>Wayfinder Chennai · software-only project · <a href="https://github.com/ungalsoththu/ChennaiGTFS" target="_blank" rel="noreferrer">MTC GTFS source</a> · <a href="https://chennaimetrorail.org/bd-category/business-development/to-know-station-wise/blue-line/" target="_blank" rel="noreferrer">CMRL official station lists</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap attribution</a></footer>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

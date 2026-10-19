@@ -361,11 +361,37 @@ async function planTrip(event) {
 }
 
 async function loadTransit() {
+  const wakeTimer = setTimeout(() => {
+    const status = $('data-status');
+    if (status && !data) {
+      status.innerHTML = '<span class="spinner-pulse"></span> Waking up server on free tier (cold starts may take ~30–45s on first visit)... Downloading Chennai transit data...';
+    }
+  }, 1800);
+
   try {
-    const response = await fetch('data/chennai-transit.json'); if (!response.ok) throw new Error('Transit data file could not be loaded.');
-    data = await response.json(); indexTransit(); feedWarnings(); renderNearbyStops(); renderMetroStations();
-  } catch (error) { $('data-status').textContent = `${error.message} Start the app with npm start from its project folder.`; }
+    const response = await fetch('data/chennai-transit.json');
+    clearTimeout(wakeTimer);
+    if (!response.ok) throw new Error('Transit data file could not be loaded.');
+    data = await response.json();
+    indexTransit();
+    feedWarnings();
+    renderNearbyStops();
+    renderMetroStations();
+  } catch (error) {
+    clearTimeout(wakeTimer);
+    $('data-status').textContent = `${error.message} Start the app with npm start from its project folder.`;
+  }
 }
+
+document.querySelectorAll('.preset-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    $('origin').value = chip.dataset.origin;
+    $('destination').value = chip.dataset.dest;
+    toast(`Route set: ${chip.textContent.trim()}`);
+    planTrip();
+  });
+});
+
 $('route-form').addEventListener('submit', planTrip);
 $('swap-locations').addEventListener('click', () => { const a = $('origin').value; $('origin').value = $('destination').value; $('destination').value = a; });
 $('use-location').addEventListener('click', () => {
