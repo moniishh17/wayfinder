@@ -3,15 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#f7f8f5">
+  <meta name="theme-color" content="#173c2f">
   <title>Wayfinder Chennai — accessible journey planner</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="#" aria-label="Wayfinder Chennai home"><span class="brand-icon">↗</span><span>wayfinder <small>CHENNAI</small></span></a>
-    <div class="top-actions"><span class="data-pill"><i></i> Open street + transit data</span><button id="blind-mode" class="quiet-button" aria-pressed="false">◖)) Audio-first mode</button></div>
+    <div class="top-actions">
+      <span class="data-pill"><i></i> Open street + transit data</span>
+      <span id="offline-pill" class="data-pill offline-pill" hidden><i></i> Offline cache active</span>
+      <button id="blind-mode" class="quiet-button" aria-pressed="false">◖)) Audio-first mode</button>
+    </div>
   </header>
   <main class="app-shell">
     <section class="intro">
@@ -19,8 +26,15 @@
       <div class="city-mark"><span>⌖</span><div><strong>Chennai, Tamil Nadu</strong><small>13.0827° N · 80.2707° E</small></div></div>
     </section>
     <section id="audio-panel" class="audio-panel" hidden aria-live="polite">
-      <div><strong>Audio-first mode</strong><p>Say a start and destination, or say “walk”, “bus”, “repeat”, or “next step”. Directions use your browser’s speech tools.</p><span id="voice-status">Camera object alerts are local to this device. This is not a safety system.</span></div>
-      <button id="voice-listen" class="primary-button">🎙 Speak</button>
+      <div>
+        <strong>Audio-first mode</strong>
+        <p>Say a route (e.g. <em>“from Central to Airport”</em>), or commands: <em>“walk”</em>, <em>“metro”</em>, <em>“bus”</em>, <em>“next”</em>, <em>“repeat”</em>, <em>“start camera”</em>, <em>“test vibration”</em>.</p>
+        <span id="voice-status">Camera proximity & direction alerts are local to this device. This is not a certified safety system.</span>
+      </div>
+      <div class="audio-actions">
+        <button id="voice-listen" class="primary-button">🎙 Speak</button>
+        <button type="button" id="test-haptic" class="outline-button">📳 Test Buzz</button>
+      </div>
     </section>
     <div class="workspace" id="visual-workspace">
       <section class="left-column">
@@ -40,9 +54,32 @@
         </section>
         <section class="panel camera-panel">
           <div class="section-heading"><div><span class="eyebrow">On-device camera</span><h2>See objects in your surroundings</h2></div><span id="camera-state" class="camera-state">OFF</span></div>
-          <p class="camera-copy">Use a phone or laptop webcam. A browser-based COCO-SSD model can label common objects in view; it does not detect curb quality, stairs, or a safe path.</p>
-          <div class="camera-row"><div id="camera-frame" class="camera-frame"><video id="camera-video" playsinline muted></video><canvas id="camera-canvas"></canvas><div class="camera-placeholder">Camera preview stays on this device</div></div><div class="camera-controls"><label for="camera-select">CAMERA</label><select id="camera-select"><option value="">Default camera</option></select><button id="camera-start" class="outline-button">Start camera</button><button id="camera-stop" class="outline-button" disabled>Stop</button><div id="detections" class="detections" aria-live="polite">Object detection not running.</div></div></div>
-          <p class="privacy-note">Video frames are processed in your browser and are not uploaded by this app. First use downloads the model files from TensorFlow’s public CDN. Object labels are experimental and do not alter route choices.</p>
+          <p class="camera-copy">Use a phone or laptop webcam. Analyzes proximity (near/far) and direction (left/center/right) with haptic buzz and audio alerts for obstacles in your path.</p>
+          <div id="proximity-banner" class="proximity-banner" hidden></div>
+          <div class="camera-row">
+            <div id="camera-frame" class="camera-frame">
+              <video id="camera-video" playsinline muted></video>
+              <canvas id="camera-canvas"></canvas>
+              <div class="camera-placeholder">Camera preview stays on this device</div>
+            </div>
+            <div class="camera-controls">
+              <label for="camera-select">CAMERA</label>
+              <select id="camera-select"><option value="">Default camera</option></select>
+              <label for="vision-speed">SCAN RATE (THERMAL/BATTERY)</label>
+              <select id="vision-speed">
+                <option value="1200">Battery Saver (0.8 FPS)</option>
+                <option value="750" selected>Balanced (1.3 FPS)</option>
+                <option value="400">High Responsiveness (2.5 FPS)</option>
+              </select>
+              <label class="haptic-toggle-row"><input type="checkbox" id="haptic-toggle" checked> Haptic buzz on phone</label>
+              <div class="camera-buttons">
+                <button id="camera-start" class="outline-button">Start camera</button>
+                <button id="camera-stop" class="outline-button" disabled>Stop</button>
+              </div>
+              <div id="detections" class="detections" aria-live="polite">Object detection not running.</div>
+            </div>
+          </div>
+          <p class="privacy-note">Video frames are processed purely in your browser and are not uploaded. Proximity warnings estimate screen coverage and are experimental guidance, not an automated safety system.</p>
         </section>
       </section>
       <section class="map-column panel"><div class="map-top"><div><strong>Chennai street map</strong><span id="map-caption">Showing actual mapped CMRL stations and MTC stops</span></div><button id="locate-map" class="icon-button" aria-label="Center map on Chennai">⌖</button></div><div id="map" role="application" aria-label="Map with Chennai transit stops and pedestrian route"></div><div class="map-legend"><span><i class="bus-key"></i>MTC stop</span><span><i class="metro-key"></i>CMRL station</span><span><i class="origin-key"></i>Start / destination</span><span><i class="walk-key"></i>OSM pedestrian route</span></div><div class="map-foot">© OpenStreetMap contributors · Metro lines are station-to-station schematics. No accessibility guarantee.</div></section>

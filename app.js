@@ -10,7 +10,14 @@ const layers = { stops: L.layerGroup().addTo(map), metro: L.layerGroup().addTo(m
 let data, stopById = new Map(), routesByStop = new Map(), routeIndex = new WeakMap();
 let endpoints = null, currentOptions = [], selectedOption = null, footSteps = [], stepCursor = 0;
 let audioMode = false, recognizer = null, cameraStream = null, detector = null, detecting = false;
-let previousAlert = '', previousAlertAt = 0, toastTimer = 0;
+let previousAlert = '', previousAlertAt = 0, lastProximityWarningAt = 0, toastTimer = 0;
+
+function vibrate(pattern) {
+  const enabled = $('haptic-toggle')?.checked ?? true;
+  if (enabled && 'vibrate' in navigator) {
+    try { navigator.vibrate(pattern); } catch {}
+  }
+}
 
 function toast(message) {
   const node = $('toast'); node.textContent = message; node.classList.add('show');
@@ -206,7 +213,29 @@ function renderTransitCards() {
   });
   return true;
 }
-function formatDistance(meters) { return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`; }
+function getChennaiWalkAdvisories(route, steps) {
+  const advisories = [];
+  const roadNames = steps.map(s => s.name || '').filter(Boolean).join(' ').toLowerCase();
+  const arterialCorridors = [
+    { pattern: /\b(anna salai|mount road)\b/i, name: 'Anna Salai (Mount Road)' },
+    { pattern: /\b(poonamallee|evr periyar|evp)\b/i, name: 'Poonamallee High Road (EVR Periyar Salai)' },
+    { pattern: /\b(gst|grand southern trunk)\b/i, name: 'GST Road' },
+    { pattern: /\b(omr|old mahabalipuram|rajiv gandhi)\b/i, name: 'OMR (Rajiv Gandhi Salai)' },
+    { pattern: /\b(100 feet|inner ring|jawaharlal nehru)\b/i, name: '100 Feet Road / Inner Ring Road' },
+    { pattern: /\b(sardar patel)\b/i, name: 'Sardar Patel Road' },
+    { pattern: /\b(kamarajar|marina)\b/i, name: 'Kamarajar Promenade' }
+  ];
+  const matchedArterials = arterialCorridors.filter(c => c.pattern.test(roadNames)).map(c => c.name);
+  if (matchedArterials.length > 0) {
+    advisories.push(`Intersects arterial corridor (${matchedArterials.join(', ')}). Heavy vehicular flow; prioritize footbridges or signalized pedestrian crossings.`);
+  }
+  if (route.distance > 1200) {
+    advisories.push(`Extended walking distance (${formatDistance(route.distance)}) in Chennai climate. Consider MTC feeder or Metro connections.`);
+  }
+  advisories.push('Chennai street reality: watch for open storm-water drain (SWD) slabs, uneven curb cuts, and parked two-wheelers on pedestrian paths.');
+  return advisories;
+}
+
 function renderDirections(route) {
   const steps = (route.legs || []).flatMap(leg => leg.steps || []).filter(step => step.distance > 8);
   footSteps = steps.map(step => {
@@ -215,8 +244,16 @@ function renderDirections(route) {
     return `${maneuver}${name} for ${formatDistance(step.distance)}.`;
   });
   if (!footSteps.length) footSteps = [`Walk ${formatDistance(route.distance)} along the pedestrian route shown on the map.`];
+  const advisories = getChennaiWalkAdvisories(route, steps);
   const detail = $('route-detail'); detail.hidden = false;
-  detail.innerHTML = `<h3>OpenStreetMap pedestrian route · ${formatDistance(route.distance)}</h3><ol>${footSteps.slice(0, 6).map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol><p class="smallprint">Pedestrian routing follows mapped foot-accessible streets; sidewalk, curb, slope, and obstacle conditions are not verified. Route timing is an estimate from the routing service.</p><button type="button" class="outline-button" id="read-walk">Read walking directions aloud</button>`;
+  detail.innerHTML = `<h3>OpenStreetMap pedestrian route · ${formatDistance(route.distance)}</h3>
+    <ol>${footSteps.slice(0, 6).map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
+    <div class="advisory-box">
+      <strong>⚠️ Chennai Pedestrian Safety Insights:</strong>
+      <ul>${advisories.map(adv => `<li>${escapeHtml(adv)}</li>`).join('')}</ul>
+    </div>
+    <p class="smallprint">Pedestrian routing follows mapped foot-accessible streets; sidewalk, curb, slope, and obstacle conditions are not verified. Route timing is an estimate from the routing service.</p>
+    <button type="button" class="outline-button" id="read-walk">Read walking directions aloud</button>`;
   $('read-walk').onclick = () => { stepCursor = 0; say(footSteps.slice(0, 6).join(' ')); };
 }
 function selectOption(index) {
@@ -354,6 +391,15 @@ function startVoice() {
 }
 function handleVoice(raw) {
   const phrase = raw.toLowerCase().trim(); $('voice-status').textContent = `Heard: ${raw}`;
+  if (phrase.includes('help')) {
+    say('Commands available: say from start to destination, or say walk, bus, metro, repeat, next step, start camera, stop camera, or test vibration.');
+    return;
+  }
+  if (phrase.includes('vibrat') || phrase.includes('buzz')) {
+    vibrate([120, 60, 120]);
+    say('Vibration test triggered.');
+    return;
+  }
   if (phrase.includes('repeat')) { say(footSteps[stepCursor] || 'No route instruction to repeat yet. Say start and destination, then plan.'); return; }
   if (phrase.includes('next step') || phrase === 'next') { stepCursor = Math.min(stepCursor + 1, footSteps.length - 1); say(footSteps[stepCursor] || 'No pedestrian directions are available yet.'); return; }
   if (phrase.includes('plan route') || phrase.startsWith('from ')) {
@@ -404,26 +450,162 @@ async function startCamera() {
   } catch (error) { $('detections').textContent = error.name === 'NotAllowedError' ? 'Camera permission was denied.' : error.message; toast('Could not start camera. Check browser permission and network.'); if (audioMode) say($('detections').textContent); stopCamera(false); }
 }
 function stopCamera(clearMessage = true) {
-  detecting = false; if (cameraStream) cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; $('camera-video').srcObject = null; $('camera-frame').classList.remove('on'); $('camera-state').textContent = 'OFF'; $('camera-state').classList.remove('on'); $('camera-start').disabled = false; $('camera-stop').disabled = true;
-  const canvas = $('camera-canvas'), ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); if (clearMessage) $('detections').textContent = 'Object detection stopped.';
+  detecting = false;
+  if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+  cameraStream = null;
+  $('camera-video').srcObject = null;
+  $('camera-frame').classList.remove('on');
+  $('camera-state').textContent = 'OFF';
+  $('camera-state').classList.remove('on');
+  $('camera-start').disabled = false;
+  $('camera-stop').disabled = true;
+  const banner = $('proximity-banner');
+  if (banner) { banner.hidden = true; banner.textContent = ''; }
+  const canvas = $('camera-canvas'), ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (clearMessage) $('detections').textContent = 'Object detection stopped.';
 }
+
+const MOBILITY_OBSTACLES = new Set(['person', 'bicycle', 'car', 'motorcycle', 'bus', 'truck', 'dog', 'bench', 'chair', 'fire hydrant', 'stop sign']);
+
 async function detectFrame() {
-  if (!detecting || !detector || !$('camera-video').videoWidth) { if (detecting) setTimeout(detectFrame, 300); return; }
-  const video = $('camera-video'), canvas = $('camera-canvas'), ctx = canvas.getContext('2d'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  if (!detecting || !detector || !$('camera-video').videoWidth) {
+    if (detecting) setTimeout(detectFrame, 300);
+    return;
+  }
+  if (document.hidden) {
+    if (detecting) setTimeout(detectFrame, 1200);
+    return;
+  }
+  const scanRate = Number($('vision-speed')?.value || 750);
+  const video = $('camera-video'), canvas = $('camera-canvas'), ctx = canvas.getContext('2d');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const frameArea = canvas.width * canvas.height;
+
   try {
-    const predictions = await detector.detect(video, 8, 0.55); ctx.clearRect(0, 0, canvas.width, canvas.height);
-    predictions.forEach(item => { const [x, y, w, h] = item.bbox; ctx.strokeStyle = '#a9efc8'; ctx.lineWidth = Math.max(2, canvas.width / 240); ctx.strokeRect(x, y, w, h); ctx.fillStyle = '#173c2fdd'; ctx.fillRect(x, Math.max(0, y - 22), Math.min(w, item.class.length * 8 + 42), 21); ctx.fillStyle = 'white'; ctx.font = `${Math.max(12, canvas.width / 55)}px sans-serif`; ctx.fillText(`${item.class} ${Math.round(item.score * 100)}%`, x + 4, Math.max(15, y - 7)); });
-    const labels = [...new Set(predictions.map(p => p.class))]; $('detections').textContent = labels.length ? `Model labels in camera view: ${labels.join(', ')}. It cannot tell whether an object blocks your route.` : 'No COCO-SSD object labels in this frame; this does not mean the path is clear.';
-    const notable = predictions.filter(p => p.score >= .65 && ['person','bicycle','car','motorcycle','bus','truck','bench','chair','stop sign'].includes(p.class)).map(p => p.class);
-    const alert = [...new Set(notable)].join(', ');
-    if (alert && alert !== previousAlert && Date.now() - previousAlertAt > 8000) { previousAlert = alert; previousAlertAt = Date.now(); if (audioMode) say(`The camera model labelled ${alert} in view. It cannot tell whether that object is in your way or assess safety.`); }
-    if (!alert) previousAlert = '';
-  } catch (error) { $('detections').textContent = `Detection paused: ${error.message}`; }
-  if (detecting) setTimeout(detectFrame, 850);
+    const predictions = await detector.detect(video, 8, 0.52);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    let closestObstacle = null;
+    let maxProximityScore = 0;
+
+    predictions.forEach(item => {
+      const [x, y, w, h] = item.bbox;
+      const areaRatio = (w * h) / frameArea;
+      const heightRatio = h / canvas.height;
+      const centerX = x + w / 2;
+      const dir = centerX < canvas.width * 0.35 ? 'left' : (centerX > canvas.width * 0.65 ? 'right' : 'center');
+      const isMobility = MOBILITY_OBSTACLES.has(item.class);
+      const isClose = (areaRatio > 0.14) || (heightRatio > 0.42 && areaRatio > 0.07);
+      const isModerate = (areaRatio > 0.05) || (heightRatio > 0.28);
+
+      const proximityScore = areaRatio * (dir === 'center' ? 1.5 : 1.0);
+      if (isMobility && proximityScore > maxProximityScore) {
+        maxProximityScore = proximityScore;
+        closestObstacle = { class: item.class, dir, isClose, isModerate, score: item.score, areaRatio };
+      }
+
+      if (isClose && isMobility) {
+        ctx.strokeStyle = '#e63946';
+        ctx.lineWidth = Math.max(3, canvas.width / 160);
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = '#e63946ee';
+        ctx.fillRect(x, Math.max(0, y - 24), Math.min(w, item.class.length * 9 + 85), 23);
+        ctx.fillStyle = 'white';
+        ctx.font = `bold ${Math.max(12, canvas.width / 50)}px sans-serif`;
+        ctx.fillText(`⚠️ ${item.class} CLOSE (${dir})`, x + 4, Math.max(16, y - 7));
+      } else if (isModerate && isMobility) {
+        ctx.strokeStyle = '#f4a261';
+        ctx.lineWidth = Math.max(2, canvas.width / 220);
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = '#f4a261ee';
+        ctx.fillRect(x, Math.max(0, y - 22), Math.min(w, item.class.length * 8 + 60), 21);
+        ctx.fillStyle = '#172523';
+        ctx.font = `${Math.max(11, canvas.width / 55)}px sans-serif`;
+        ctx.fillText(`${item.class} (${dir})`, x + 4, Math.max(15, y - 7));
+      } else {
+        ctx.strokeStyle = '#a9efc8';
+        ctx.lineWidth = Math.max(1.5, canvas.width / 260);
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = '#173c2fdd';
+        ctx.fillRect(x, Math.max(0, y - 20), Math.min(w, item.class.length * 8 + 42), 19);
+        ctx.fillStyle = 'white';
+        ctx.font = `${Math.max(11, canvas.width / 58)}px sans-serif`;
+        ctx.fillText(`${item.class} ${Math.round(item.score * 100)}%`, x + 4, Math.max(14, y - 6));
+      }
+    });
+
+    const banner = $('proximity-banner');
+    if (closestObstacle && closestObstacle.isClose) {
+      if (banner) {
+        banner.hidden = false;
+        banner.className = 'proximity-banner warning';
+        banner.textContent = `⚠️ Proximity Warning: ${closestObstacle.class} directly ${closestObstacle.dir === 'center' ? 'ahead in path' : 'on ' + closestObstacle.dir}!`;
+      }
+      if (closestObstacle.dir === 'center') {
+        vibrate([120, 60, 120]);
+      } else {
+        vibrate(80);
+      }
+      if (Date.now() - lastProximityWarningAt > 4500) {
+        lastProximityWarningAt = Date.now();
+        if (audioMode) say(`Warning: ${closestObstacle.class} ${closestObstacle.dir === 'center' ? 'directly ahead' : 'on ' + closestObstacle.dir}, close.`);
+      }
+    } else if (closestObstacle && closestObstacle.isModerate) {
+      if (banner) {
+        banner.hidden = false;
+        banner.className = 'proximity-banner caution';
+        banner.textContent = `Caution: ${closestObstacle.class} detected ${closestObstacle.dir === 'center' ? 'ahead' : 'on ' + closestObstacle.dir}.`;
+      }
+    } else {
+      if (banner) {
+        banner.hidden = true;
+        banner.textContent = '';
+      }
+    }
+
+    const labels = [...new Set(predictions.map(p => p.class))];
+    $('detections').textContent = labels.length
+      ? `Model labels in view: ${labels.join(', ')} (${scanRate < 600 ? '2.5 FPS' : scanRate < 1000 ? '1.3 FPS' : '0.8 FPS saver'}). Proximity alerts active.`
+      : 'No COCO-SSD object labels in this frame; does not confirm clear path.';
+  } catch (error) {
+    $('detections').textContent = `Detection paused: ${error.message}`;
+  }
+
+  if (detecting) setTimeout(detectFrame, scanRate);
 }
-$('camera-start').addEventListener('click', startCamera); $('camera-stop').addEventListener('click', stopCamera);
+
+$('camera-start').addEventListener('click', startCamera);
+$('camera-stop').addEventListener('click', stopCamera);
 $('camera-select').addEventListener('change', () => { if (cameraStream) startCamera(); });
+$('test-haptic')?.addEventListener('click', () => {
+  if ('vibrate' in navigator) {
+    vibrate([120, 60, 120]);
+    toast('Vibration triggered! (Double pulse)');
+  } else {
+    toast('Vibration API not supported on this device/browser.');
+  }
+});
 navigator.mediaDevices?.addEventListener?.('devicechange', listCameras);
 window.addEventListener('beforeunload', stopCamera);
+
+// PWA Service Worker Registration & offline pill handling
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(() => {
+      const pill = $('offline-pill');
+      if (pill) {
+        const updateStatus = () => {
+          pill.hidden = false;
+          pill.innerHTML = navigator.onLine ? '<i></i> Offline-ready (PWA)' : '<i style="background:#e76f51"></i> Offline mode';
+        };
+        updateStatus();
+        window.addEventListener('online', updateStatus);
+        window.addEventListener('offline', updateStatus);
+      }
+    }).catch(() => {});
+  });
+}
 
 loadTransit(); listCameras();

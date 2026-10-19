@@ -1,0 +1,17 @@
+{
+  "name": "Wayfinder Chennai",
+  "short_name": "Wayfinder",
+  "description": "Accessible multimodal journey planner for Chennai with transit, pedestrian routing, and vision assistance",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f8f5",
+  "theme_color": "#173c2f",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

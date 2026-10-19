@@ -23,12 +23,21 @@ The free service sleeps after 15 minutes without traffic and its first request a
 
 ## What works
 
-- Resolves known CMRL stations and MTC stops directly from the bundled Chennai data, then searches other places on explicit submit with OpenStreetMap Nominatim. The small Node server adds an application identifier, rate-limits requests, and caches results.
-- Requests a pedestrian route from the OpenStreetMap routing community server and draws its actual route geometry and directions on Leaflet. This does not confirm wheelchair access or safe sidewalk conditions.
-- Finds MTC bus route patterns from a bundled extract of Chennai GTFS stops, routes, trips, and stop times. Candidate ranking uses the straight-line distance to boarding/alighting stops and transfer count; it does not claim to minimize travel time.
-- Builds CMRL Phase I Blue/Green Line station sequences from current official CMRL station lists, using station coordinates in the Chennai GTFS stop file. It draws a schematic between station points and links to CMRL's official planner for current train times and fares.
-- Offers speech output and browser-supported speech input for route lookup and navigation controls.
-- Connects a phone or webcam and runs TensorFlow.js COCO-SSD object labeling in the browser. Video frames stay on the device. The model names common objects; it does not detect curb ramps, stairs, sidewalk quality, or whether a detected object blocks a route. It never changes the route or claims a path is safe.
+- **Offline-Ready PWA**: Includes a Web App Manifest and Service Worker with Cache API caching. Once visited, the app shell and the entire bundled Chennai GTFS transit dataset are accessible offline when commuting in low-connectivity areas or underground CMRL corridors.
+- **Multimodal Transit Planning**:
+  - Resolves known CMRL stations and MTC stops directly from the bundled Chennai data, then searches other places on explicit submit with OpenStreetMap Nominatim with rate limiting and in-memory caching.
+  - Builds CMRL Phase I Blue/Green Line station sequences from official station lists with schematic track links and CMRL travel planner integration.
+  - Finds MTC bus route patterns from bundled GTFS stops, routes, and trips with accessible boarding filters.
+- **Pedestrian Routing & Chennai Street Insights**:
+  - Requests turn-by-turn foot directions from OpenStreetMap routing community server.
+  - Scans routes for Chennai arterial corridors (Anna Salai, Poonamallee High Road, GST Road, OMR, 100 Feet Road, Sardar Patel Road) to surface localized pedestrian crossing cautions and weather advisories.
+- **Proximity & Direction-Aware Vision Assist**:
+  - Connects a phone camera or laptop webcam and runs TensorFlow.js COCO-SSD on-device.
+  - Analyzes bounding box coverage and horizontal position to classify obstacle **proximity** (Close / Moderate) and **direction** (Left / Ahead / Right).
+  - Triggers **Haptic Vibration pulses** (on supported mobile devices) and directional speech warnings when an obstacle is directly in the walking path.
+  - Features configurable scan rates (Battery Saver 0.8 FPS, Balanced 1.3 FPS, Responsive 2.5 FPS) and background tab pausing to prevent smartphone thermal throttling.
+- **Audio-First Mode**:
+  - Comprehensive voice navigation and controls via SpeechRecognition and SpeechSynthesis (e.g., *"from Central to Airport"*, *"walk"*, *"metro"*, *"bus"*, *"next"*, *"repeat"*, *"start camera"*, *"test vibration"*, *"help"*).
 
 ## Data provenance and important limits
 
